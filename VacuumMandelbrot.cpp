@@ -17,31 +17,26 @@ public:
 	void iterate() {
 		if (!escaped) {
 			z = (pow(z, 2)) + c;
-				self.count += 1
-				if abs(self.z) >= 2 :
-			self.color = ((self.count * 8) % 256, (self.count * 6) % 256, (self.count * 12) % 256)
-				self.escaped = True
+			count += 1;
+			if (abs(z) >= 2) {
+				color = sf::Color((count * 8) % 256, (count * 6) % 256, (count * 12) % 256);
+				escaped = true;
+			}
 		}
 	}
+	void draw(sf::Image& image) {
+		image.setPixel(position.x, position.y, color);
+	}
 private:
+	sf::Vector2f position;
+	complex<double> c;
 	complex<double> z = (0, 0);
 	int count = 0;
 	bool escaped = false;
 	sf::Color color = sf::Color(255,255,255);
 };
 
-int iterations(complex<double> c) {
-	complex<double> z(0, 0);
-	int count = 0;
-	while (abs(z) < 2 && count < 255 * 10) {
-		z = (pow(z, 2)) + c;
-		count += 1;
-	}
-	return count;
-}
-
-
-void fill_array(sf::VertexArray& set, float scale, int width, int height, sf::Vector2f mouse, int thread, int max_threads) {
+void fill_array(vector<Pixel*>& pixels, float scale, int width, int height, sf::Vector2f mouse) {
 	sf::Vector2f shift;
 	long double horizontalStart;
 	long double horizontalEnd;
@@ -73,27 +68,11 @@ void fill_array(sf::VertexArray& set, float scale, int width, int height, sf::Ve
 
 			if (position.x >= 0 and position.x <= width and position.y >= 0 and position.y <= height) {
 
-				if (position.x >= ((width / max_threads) * thread) and position.x <= ((width / max_threads) * (thread + 1))) {
+				complex<double> c(t, m);
 
-					complex<double> c(t, m);
-
-					num = iterations(c);
-
-					set.append(sf::Vertex(position, sf::Color(num * 8, num * 6, num * 12)));
-				}
+				pixels.push_back(new Pixel(c, position));
 			}
 		}
-	}
-}
-
-void make_set(list<sf::VertexArray>& sets, list<sf::VertexArray>::iterator setIter, list<thread>& active_threads, int max_threads, float scale, int window_width, int window_height, sf::Vector2f mouse) {
-	int i = 0;
-	for (setIter = sets.begin(); setIter != sets.end(); setIter++) {
-		(*setIter).clear();
-	}
-	for (auto& s : sets) {
-		active_threads.emplace_back(fill_array, ref(s), scale, window_width, window_height, mouse, i, max_threads);
-		i++;
 	}
 }
 
@@ -108,21 +87,20 @@ int main() {
 	float scale = 1;
 	scale = pow(2, 25);
 	sf::Event event;
-	list<thread> active_threads;
-	int max_threads = 16;
-	list<sf::VertexArray> sets;
-	list<sf::VertexArray>::iterator setIter;
+	/*list<thread> active_threads;
+	int max_threads = 16;*/
+	sf::Image image;
+	image.create(window.getSize().x, window.getSize().y, bgColor);
+	sf::Texture tex;
+	tex.loadFromImage(image);
+	sf::Sprite mandel(tex);
+	vector<Pixel*> pixels;
 	sf::CircleShape dot(1);
 	dot.setFillColor(sf::Color::Green);
 	dot.setPosition(500, 500);
 
 	//INITIAL SET CREATION---------------------------------------------------
-	for (int i = 0; i < max_threads; i++) {
-		sf::VertexArray s1;
-		s1.setPrimitiveType(sf::PrimitiveType::Points);
-		sets.push_back(s1);
-	}
-	make_set(sets, setIter, active_threads, max_threads, scale, window.getSize().x, window.getSize().y, sf::Vector2f(562.500010976, 499.999999997));
+	fill_array(pixels, scale, window.getSize().x, window.getSize().y, sf::Vector2f(500, 500));
 
 	//GAME LOOP--------------------------------------------------------------
 	while (window.isOpen()) {
@@ -143,7 +121,7 @@ int main() {
 				else if (event.mouseWheelScroll.delta < 0) {
 					scale /= 2;
 				}
-				make_set(sets, setIter, active_threads, max_threads, scale, window.getSize().x, window.getSize().y, sf::Vector2f(567.844982197, 498.716377632));
+				fill_array(pixels, scale, window.getSize().x, window.getSize().y, sf::Vector2f(event.mouseWheelScroll.x, event.mouseWheelScroll.y));
 				cout << scale << endl;
 				//cout << event.mouseWheelScroll.x << ", " << event.mouseWheelScroll.y << endl;
 				//60.538 - .0001, 495.551 + .0001
@@ -151,20 +129,14 @@ int main() {
 				//567.844982197, 498.716377632
 			}
 		}
-		for (auto& th : active_threads) {
-			if (th.joinable())
-				th.join();
-		}
 		//RENDER--------------------------------------------------------------
 		window.clear(bgColor);
-		for (setIter = sets.begin(); setIter != sets.end(); setIter++) {
-			window.draw(*setIter);
+		for (auto& iter : pixels) {
+			iter->iterate();
+			iter->draw(image);
 		}
+		window.draw(mandel);
 		window.draw(dot);
 		window.display();
-	}
-	for (auto& th : active_threads) {
-		if (th.joinable())
-			th.join();
 	}
 }
