@@ -10,22 +10,21 @@ using namespace std;
 
 class Pixel {
 public:
-	Pixel(complex<double> c, sf::Vector2f position) {
-		complex<double> c = c;
-		sf::Vector2f position = position;
+	Pixel(complex<double> loc, sf::Vector2f pos) {
+		c = loc;
+		position = pos;
 	}
-	void iterate() {
+	bool iterate(sf::Image& image) {
 		if (!escaped) {
 			z = (pow(z, 2)) + c;
 			count += 1;
 			if (abs(z) >= 2) {
-				color = sf::Color((count * 8) % 256, (count * 6) % 256, (count * 12) % 256);
+				color = sf::Color((count * 8), (count * 6), (count * 12));
 				escaped = true;
 			}
 		}
-	}
-	void draw(sf::Image& image) {
 		image.setPixel(position.x, position.y, color);
+		return escaped;
 	}
 private:
 	sf::Vector2f position;
@@ -58,7 +57,6 @@ void fill_array(vector<Pixel*>& pixels, float scale, int width, int height, sf::
 	verticalEnd = scaleEnd + ((origin.y - shift.y) / verticalSize);
 
 	sf::Vector2f position;
-	int num;
 	for (long double t = horizontalStart; t < horizontalEnd; t += horizontalRes) {
 
 		for (long double m = verticalStart; m < verticalEnd; m += verticalRes) {
@@ -76,31 +74,48 @@ void fill_array(vector<Pixel*>& pixels, float scale, int width, int height, sf::
 	}
 }
 
+void draw(vector<Pixel*>& pixels, sf::Image& image, int index_begin, int index_end) {
+		for (int i = index_begin; i < index_end; i++) {
+			pixels[i]->iterate(ref(image));
+		}
+}
+
+vector<thread> create_threads(vector<Pixel*>& pixels, sf::Image& image, int max) {
+	vector<thread> threads;
+	int section;
+	for (int i = 0; i < max; i++) {
+		section = pixels.size() / max;
+		threads.emplace_back(draw, ref(pixels), ref(image), section * i, (section * (i + 1)) - 1);
+	}
+	return threads;
+}
+
+
 int main() {
 	//RENDER SETUP----------------------------------------------------------
 	sf::RenderWindow window(sf::VideoMode(1000, 1000), "Mandelbrot Set", sf::Style::None);
 	window.setPosition(sf::Vector2i(460, 20));
-	window.setFramerateLimit(60);
 
 	//VARIABLES-------------------------------------------------------------
 	sf::Color bgColor = sf::Color(8, 6, 12);
 	float scale = 1;
-	scale = pow(2, 25);
+	scale = pow(2, 24);
 	sf::Event event;
-	/*list<thread> active_threads;
-	int max_threads = 16;*/
+	vector<thread> active_threads;
+	int max_threads = 16;
 	sf::Image image;
 	image.create(window.getSize().x, window.getSize().y, bgColor);
-	sf::Texture tex;
-	tex.loadFromImage(image);
-	sf::Sprite mandel(tex);
+	sf::Texture texture;
+	texture.loadFromImage(image);
+	sf::Sprite mandel(texture);
 	vector<Pixel*> pixels;
+	vector<Pixel*>::iterator iter;
 	sf::CircleShape dot(1);
 	dot.setFillColor(sf::Color::Green);
 	dot.setPosition(500, 500);
 
 	//INITIAL SET CREATION---------------------------------------------------
-	fill_array(pixels, scale, window.getSize().x, window.getSize().y, sf::Vector2f(500, 500));
+	fill_array(ref(pixels), scale, window.getSize().x, window.getSize().y, sf::Vector2f(60.538 - .0001, 495.551 + .0001));
 
 	//GAME LOOP--------------------------------------------------------------
 	while (window.isOpen()) {
@@ -121,7 +136,8 @@ int main() {
 				else if (event.mouseWheelScroll.delta < 0) {
 					scale /= 2;
 				}
-				fill_array(pixels, scale, window.getSize().x, window.getSize().y, sf::Vector2f(event.mouseWheelScroll.x, event.mouseWheelScroll.y));
+				pixels.clear();
+				fill_array(ref(pixels), scale, window.getSize().x, window.getSize().y, sf::Vector2f(60.538 - .0001, 495.551 + .0001));
 				cout << scale << endl;
 				//cout << event.mouseWheelScroll.x << ", " << event.mouseWheelScroll.y << endl;
 				//60.538 - .0001, 495.551 + .0001
@@ -131,11 +147,17 @@ int main() {
 		}
 		//RENDER--------------------------------------------------------------
 		window.clear(bgColor);
-		for (auto& iter : pixels) {
-			iter->iterate();
-			iter->draw(image);
+
+		active_threads = create_threads(ref(pixels), ref(image), max_threads);
+		for (auto& th : active_threads) {
+			if (th.joinable()) {
+				th.join();
+			}
 		}
+
+		texture.loadFromImage(image);
 		window.draw(mandel);
+
 		window.draw(dot);
 		window.display();
 	}
