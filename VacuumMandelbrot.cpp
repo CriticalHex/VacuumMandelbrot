@@ -10,7 +10,7 @@ using namespace std;
 
 class Pixel { //Class for each pixel in the pixel vector.
 public:		  //Stores all the information needed per pixel.
-	Pixel(complex<double> loc, long double pos[2]) { //constructor
+	Pixel(complex<double> loc, int pos[2]) { //constructor
 		c = loc; //c part of the mandelbrot set
 		position[0] = pos[0]; //the pixel coordinate of that c value
 		position[1] = pos[1];
@@ -62,19 +62,22 @@ void fill_array(vector<Pixel*>& pixels, long double scale, int width, int height
 	verticalStart = scaleStart + ((origin[1] - shift[1]) / verticalSize);
 	verticalEnd = scaleEnd + ((origin[1] - shift[1]) / verticalSize);
 
-	long double position[2] = { 0, 0 };
+	complex<double> c;
+	int position[2] = { 0, 0 };
 	for (long double t = horizontalStart; t < horizontalEnd; t += horizontalRes) { //loop through the cols
 
 		for (long double m = verticalStart; m < verticalEnd; m += verticalRes) { //loop through the rows
 
-			position[0] = int((t * horizontalSize) + shift[0]); //i know this is ints, and the data type is long double.
-			position[1] = int((m * verticalSize) + shift[1]);  //i'll be messing with ints and doubles more so if this isn't true anymore, oh well.
+			position[0] = (t * horizontalSize) + shift[0]; //i know this is ints, and the data type is long double.
+			position[1] = (m * verticalSize) + shift[1];  //i'll be messing with ints and doubles more so if this isn't true anymore, oh well.
 
 			if (position[0] >= 0 and position[0] <= width and position[1] >= 0 and position[1] <= height) { //are we on the screen? if not, why would we calculate those pixels?
 
-				complex<double> c(t, m); //the graph is technically on the complex plane, this is just where we implement that.
+				c._Val[0] = t;
+				c._Val[1] = m; //the graph is technically on the complex plane, this is just where we implement that.
 
-				pixels.push_back(new Pixel(c, position)); //creation of the pixel object.
+				pixels.push_back(new Pixel(c, position)); //creation of the pixel object. 
+				//AHHH thats the ^^^ memory leak somehow I think
 			}
 		}
 	}
@@ -145,14 +148,14 @@ int main() {
 					zooms -= 1;
 				}
 				pixels.clear(); //reset the pixels.
-				fill_array(ref(pixels), scale, window.getSize().x, window.getSize().y, sf::Vector2f(62.5003972516, 500));
+				fill_array(ref(pixels), scale, window.getSize().x, window.getSize().y, sf::Vector2f(event.mouseWheelScroll.x, event.mouseWheelScroll.y));
 				cout << zooms << endl;
-				//cout << event.mouseWheelScroll.x << ", " << event.mouseWheelScroll.y << endl;
+				//cout << event.mouseWheelScroll.x << ", " << event.mouseWheelScroll.y << endl; 
 				//60.5379, 495.55110165
-				//event.mouseWheelScroll.x, event.mouseWheelScroll.y
+				//event.mouseWheelScroll.x, event.mouseWheelScroll.y //use this for mouse control when zooming
 				//567.844982197, 498.716377632
 				//590.060110859, 339.671734734 from video
-				//62.5003972516, 500 other video
+				//62.5003972516, 500 other video, probably best zoom location i have
 			}
 		}
 		//RENDER--------------------------------------------------------------
