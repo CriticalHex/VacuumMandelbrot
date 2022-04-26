@@ -15,6 +15,9 @@ public:		  //Stores all the information needed per pixel.
 		position[0] = pos[0]; //the pixel coordinate of that c value
 		position[1] = pos[1];
 	}
+	~Pixel() {
+
+	}
 	bool iterate(sf::Image& image) { //the function that does the mandelbrot calculations.
 		if (!escaped) { //don't calculate if it already escaped.
 			z = (pow(z, 2)) + c;
@@ -28,7 +31,7 @@ public:		  //Stores all the information needed per pixel.
 		return escaped; //unneccesary currently, I was looking to use this to trim the array length for faster computing but I didn't have any luck
 	}
 private:
-	long double position[2]; //pixel coord
+	int position[2]; //pixel coord
 	complex<double> c; //c part
 	complex<double> z = (0, 0); //starting value
 	int count = 0; //how many times did it iterate before escaping
@@ -64,12 +67,14 @@ void fill_array(vector<Pixel*>& pixels, long double scale, int width, int height
 
 	complex<double> c;
 	int position[2] = { 0, 0 };
+	//cout << horizontalRes << ", " << verticalRes << endl;
+	cout << "Starting... ";
 	for (long double t = horizontalStart; t < horizontalEnd; t += horizontalRes) { //loop through the cols
 
 		for (long double m = verticalStart; m < verticalEnd; m += verticalRes) { //loop through the rows
 
-			position[0] = (t * horizontalSize) + shift[0]; //i know this is ints, and the data type is long double.
-			position[1] = (m * verticalSize) + shift[1];  //i'll be messing with ints and doubles more so if this isn't true anymore, oh well.
+			position[0] = (t * horizontalSize) + shift[0]; // scaling up the c value to pixel coordinate
+			position[1] = (m * verticalSize) + shift[1];  //
 
 			if (position[0] >= 0 and position[0] <= width and position[1] >= 0 and position[1] <= height) { //are we on the screen? if not, why would we calculate those pixels?
 
@@ -81,6 +86,7 @@ void fill_array(vector<Pixel*>& pixels, long double scale, int width, int height
 			}
 		}
 	}
+	cout << "Finished!\n";
 }
 
 void draw(vector<Pixel*>& pixels, sf::Image& image, int index_begin, int index_end) { //called by the threads to call the iterate function on every pixel.
@@ -99,14 +105,14 @@ vector<thread> create_threads(vector<Pixel*>& pixels, sf::Image& image, int max)
 }
 
 
-int main() {
+int main() { 
 	//RENDER SETUP----------------------------------------------------------
 	sf::RenderWindow window(sf::VideoMode(1000, 1000), "Mandelbrot Set", sf::Style::None); //window without title bar
 	window.setPosition(sf::Vector2i(460, 20)); //put window where i want it. yes these are magic numbers.
 
 	//VARIABLES-------------------------------------------------------------
 	sf::Color bgColor = sf::Color(8, 6, 12); //the color that one iteration before escape returns.
-	int zooms = 0; //max 43 before old error shows up, hopefully a future fix
+	int zooms = 44; //max 44 before old error shows up, hopefully a future fix
 	long double scale = pow(2, zooms); //level of zoom in
 	
 	sf::Event event;
@@ -124,7 +130,7 @@ int main() {
 	dot.setPosition(500, 500);
 
 	//INITIAL SET CREATION---------------------------------------------------
-	fill_array(ref(pixels), scale, window.getSize().x, window.getSize().y, sf::Vector2f(500, 500));
+	fill_array(ref(pixels), scale, window.getSize().x, window.getSize().y, sf::Vector2f(62.5003972516, 500));
 
 	//GAME LOOP--------------------------------------------------------------
 	while (window.isOpen()) {
@@ -148,8 +154,8 @@ int main() {
 					zooms -= 1;
 				}
 				pixels.clear(); //reset the pixels.
-				fill_array(ref(pixels), scale, window.getSize().x, window.getSize().y, sf::Vector2f(event.mouseWheelScroll.x, event.mouseWheelScroll.y));
-				cout << zooms << endl;
+				fill_array(ref(pixels), scale, window.getSize().x, window.getSize().y, sf::Vector2f(62.5003972516, 500));
+				//cout << zooms << endl;
 				//cout << event.mouseWheelScroll.x << ", " << event.mouseWheelScroll.y << endl; 
 				//60.5379, 495.55110165
 				//event.mouseWheelScroll.x, event.mouseWheelScroll.y //use this for mouse control when zooming
@@ -166,6 +172,7 @@ int main() {
 			if (th.joinable()) {
 				th.join(); //wait for threads to exit before continuing. without this it crashes.
 			}
+			th.~thread();
 		}
 		active_threads.clear(); //just to be sure
 
