@@ -91,17 +91,21 @@ void fill_array(vector<Pixel*>& pixels, long double scale, int width, int height
 
 void draw(vector<Pixel*>& pixels, sf::Image& image, int index_begin, int index_end) { //called by the threads to call the iterate function on every pixel.
 		for (int i = index_begin; i < index_end; i++) { //the thread division
-			pixels[i]->iterate(ref(image)); //call iterate with a reference to the sf::Image
+			pixels[i]->iterate(image); //call iterate with a reference to the sf::Image
 		}
 }
 
-vector<thread> create_threads(vector<Pixel*>& pixels, sf::Image& image, int max) { //creates the threads for multithreading
-	vector<thread> threads; //initialize vector to fill
+void create_threads(vector<thread>& active_threads, vector<Pixel*>& pixels, sf::Image& image, int max) { //creates the threads for multithreading
 	int section = pixels.size() / max;;
 	for (int i = 0; i < max; i++) { // for max threads:
-		threads.emplace_back(draw, ref(pixels), ref(image), section * i, (section * (i + 1)) - 1); //divides the screen evenly amongst threads, threads call the draw function.
+		active_threads.emplace_back(draw, ref(pixels), ref(image), section * i, (section * (i + 1)) - 1); //divides the screen evenly amongst threads, threads call the draw function.
 	}
-	return threads; //give the thread vector to main
+}
+
+void empty_pixels(vector<Pixel*>& pixels) {
+	for (auto& p : pixels) {
+		free(p);
+	}
 }
 
 
@@ -112,7 +116,7 @@ int main() {
 
 	//VARIABLES-------------------------------------------------------------
 	sf::Color bgColor = sf::Color(8, 6, 12); //the color that one iteration before escape returns.
-	int zooms = 44; //max 44 before old error shows up, hopefully a future fix
+	int zooms = 0; //max 44 before old error shows up, hopefully a future fix
 	long double scale = pow(2, zooms); //level of zoom in
 	
 	sf::Event event;
@@ -124,13 +128,12 @@ int main() {
 	texture.loadFromImage(image); //
 	sf::Sprite mandel(texture); //
 	vector<Pixel*> pixels;
-	vector<Pixel*>::iterator iter;
 	sf::CircleShape dot(1); //these three are the dot in the center of the screen so you can tell where you're zooming.
 	dot.setFillColor(sf::Color::Green);
 	dot.setPosition(500, 500);
 
 	//INITIAL SET CREATION---------------------------------------------------
-	fill_array(ref(pixels), scale, window.getSize().x, window.getSize().y, sf::Vector2f(62.5003972516, 500));
+	fill_array(pixels, scale, window.getSize().x, window.getSize().y, sf::Vector2f(500, 500));
 
 	//GAME LOOP--------------------------------------------------------------
 	while (window.isOpen()) {
@@ -153,8 +156,9 @@ int main() {
 					scale /= 2;
 					zooms -= 1;
 				}
-				pixels.clear(); //reset the pixels.
-				fill_array(ref(pixels), scale, window.getSize().x, window.getSize().y, sf::Vector2f(62.5003972516, 500));
+				empty_pixels(pixels);
+				pixels.clear();
+				fill_array(pixels, scale, window.getSize().x, window.getSize().y, sf::Vector2f(62.5003972516, 500));
 				//cout << zooms << endl;
 				//cout << event.mouseWheelScroll.x << ", " << event.mouseWheelScroll.y << endl; 
 				//60.5379, 495.55110165
@@ -167,14 +171,12 @@ int main() {
 		//RENDER--------------------------------------------------------------
 		window.clear(bgColor);
 
-		active_threads = create_threads(ref(pixels), ref(image), max_threads); //create threads to iterate drawing.
+		create_threads(active_threads, pixels, image, max_threads); //create threads to iterate drawing.
 		for (auto& th : active_threads) {
 			if (th.joinable()) {
 				th.join(); //wait for threads to exit before continuing. without this it crashes.
 			}
-			th.~thread();
 		}
-		active_threads.clear(); //just to be sure
 
 		texture.loadFromImage(image); //update the sprite with the image
 		window.draw(mandel); //draw the sprite
